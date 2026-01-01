@@ -1,10 +1,19 @@
 #!/usr/bin/env python3
+"""
+Fetch open strain data and estimate PSD from OFF-SOURCE segments.
+
+Strategy:
+- Fetch a long segment (default ±512s around event)
+- Use off-source windows (before and after the on-source segment) for PSD estimation
+- Save the on-source segment with the off-source PSD
+"""
 import argparse
 import numpy as np
 from gwpy.timeseries import TimeSeries
 
+
 def welch_psd(x, fs, nperseg, noverlap):
-    # Simple Welch using numpy FFTs (keeps deps minimal). Use scipy.signal.welch if preferred.
+    """Simple Welch PSD using numpy FFTs."""
     step = nperseg - noverlap
     if step <= 0:
         raise ValueError("noverlap must be < nperseg")
@@ -21,62 +30,94 @@ def welch_psd(x, fs, nperseg, noverlap):
     P = None
     for seg in segs:
         X = np.fft.rfft(seg * w)
+        # Periodogram: |X|^2 / (fs * w_norm) gives two-sided PSD
         ps = (np.abs(X)**2) / (fs * w_norm)
         P = ps if P is None else (P + ps)
     P /= len(segs)
+
+    # Convert to one-sided PSD (factor of 2 for positive frequencies)
+    # DC and Nyquist bins are not doubled
+    P[1:-1] *= 2
+
     f = np.fft.rfftfreq(nperseg, d=1/fs)
     return f, P
+
 
 def main():
     p = argparse.ArgumentParser()
     p.add_argument("--event", type=str, default="GW150914")
-    p.add_argument("--duration", type=float, default=32.0)
+    p.add_argument("--duration", type=float, default=32.0,
+                   help="On-source segment duration (seconds)")
+    p.add_argument("--psd-duration", type=float, default=512.0,
+                   help="Total duration to fetch for off-source PSD estimation (seconds on each side)")
     p.add_argument("--sample-rate", type=int, default=4096)
     p.add_argument("--ifos", type=str, default="H1,L1")
-    p.add_argument("--gps", type=float, default=None, help="Override GPS time (otherwise use GWpy's open-data event mapping)")
+    p.add_argument("--gps", type=float, default=None,
+                   help="Event GPS time (required). Example: 1126259462 for GW150914.")
     p.add_argument("--outdir", type=str, default="out")
     args = p.parse_args()
 
     ifos = [s.strip() for s in args.ifos.split(",") if s.strip()]
     osr = args.sample_rate
     dur = args.duration
+    psd_dur = args.psd_duration
 
-    # GWpy can fetch by event name for open data:
-    # TimeSeries.fetch_open_data('H1', t0, t1, cache=True)
-    # We'll use the event's GPS from GWpy open data helper via event_name=...
-    # Simpler: ask GWpy to fetch around event central time if gps is given.
     if args.gps is None:
-        # GWpy supports event name via `TimeSeries.fetch_open_data` with "event=..."
-        # We will fetch the standard open segment around the event time by querying the event catalog implicitly.
-        # If this fails on your machine, set --gps manually from GWOSC.
-        raise SystemExit("Please supply --gps (event GPS time) for reproducible fetching. Example: 1126259462 for GW150914.")
+        raise SystemExit("Please supply --gps (event GPS time). Example: 1126259462 for GW150914.")
     gps = float(args.gps)
 
-    t0 = gps - dur/2
-    t1 = gps + dur/2
+    # On-source segment boundaries
+    on_t0 = gps - dur / 2
+    on_t1 = gps + dur / 2
+
+    # Fetch wider segment for off-source PSD
+    fetch_t0 = gps - psd_dur
+    fetch_t1 = gps + psd_dur
 
     import os
     os.makedirs(args.outdir, exist_ok=True)
 
     for ifo in ifos:
-        ts = TimeSeries.fetch_open_data(ifo, t0, t1, sample_rate=osr, cache=True)
-        x = ts.value.astype(float)
+        print(f"[{ifo}] Fetching {2*psd_dur}s of data around GPS {gps}...")
+        ts = TimeSeries.fetch_open_data(ifo, fetch_t0, fetch_t1, sample_rate=osr, cache=True)
+        full_data = ts.value.astype(float)
         fs = osr
 
-        # PSD from full segment (you may prefer off-source; this is minimal scaffold)
-        nperseg = min(len(x), 4*fs)  # 4s segments
-        noverlap = nperseg//2
-        f, P = welch_psd(x, fs, nperseg=nperseg, noverlap=noverlap)
+        # Compute sample indices
+        n_total = len(full_data)
+        dt = 1.0 / fs
+        times = fetch_t0 + np.arange(n_total) * dt
 
-        # Save time series and PSD
+        # On-source indices
+        on_mask = (times >= on_t0) & (times < on_t1)
+        on_data = full_data[on_mask]
+        on_times = times[on_mask]
+
+        # Off-source: use data BEFORE and AFTER the on-source segment
+        # Exclude a buffer around the event to avoid signal contamination
+        # Buffer accounts for: on-source segment + taper regions + safety margin
+        buffer = 8.0  # seconds buffer around on-source (conservative)
+        off_mask = ((times < on_t0 - buffer) | (times >= on_t1 + buffer))
+        off_data = full_data[off_mask]
+
+        print(f"[{ifo}] On-source: {len(on_data)} samples ({dur}s)")
+        print(f"[{ifo}] Off-source for PSD: {len(off_data)} samples ({len(off_data)/fs:.1f}s)")
+
+        # PSD from off-source data
+        nperseg = min(len(off_data), 4 * fs)  # 4s segments
+        noverlap = nperseg // 2
+        f, P = welch_psd(off_data, fs, nperseg=nperseg, noverlap=noverlap)
+
+        # Save on-source time series with off-source PSD
         np.savez(
             os.path.join(args.outdir, f"{args.event}_{ifo}_data_psd.npz"),
-            t=np.linspace(t0, t1, len(x), endpoint=False),
-            x=x,
+            t=on_times,
+            x=on_data,
             f=f,
             psd=P
         )
-        print(f"Saved {args.outdir}/{args.event}_{ifo}_data_psd.npz")
+        print(f"[{ifo}] Saved {args.outdir}/{args.event}_{ifo}_data_psd.npz")
+
 
 if __name__ == "__main__":
     main()
