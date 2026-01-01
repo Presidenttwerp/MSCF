@@ -1,0 +1,6 @@
+bilby
+dynesty
+gwpy
+numpy
+scipy
+matplotlib

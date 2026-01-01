@@ -1,0 +1,10 @@
+__pycache__/
+*.pyc
+.venv/
+.env
+.DS_Store
+out/
+*.npz
+*.hdf5
+*.h5
+*.log
