@@ -8,14 +8,13 @@ class GaussianFDLikelihood(bilby.core.likelihood.Likelihood):
     Gaussian frequency-domain likelihood for complex rFFT data.
 
     Uses the Whittle likelihood for one-sided PSD:
-      ln L = -4 * sum( |d(f) - h(f)|^2 / S_n(f) ) * df
+      ln L = -2 * sum( |d(f) - h(f)|^2 / (S_n(f) * df) )
 
-    The factor of 4 comes from the standard GW inner product:
-      <a|b> = 4 Re int_0^inf a*(f) b(f) / S_n(f) df
-    and ln L = -1/2 <d-h|d-h> = -2 Re int |d-h|^2 / S_n df
+    This matches the noise generation convention where:
+      noise_fft has E[|n(f)|^2] = S_n(f) * df
 
-    For complex data (rfft output), |d-h|^2 already includes both Re and Im,
-    so we use factor 4 to match the standard normalization.
+    Each complex frequency bin contributes 2 degrees of freedom (Re and Im),
+    so chi^2 = 2 * sum(|d-h|^2 / (S_n * df)) has E[chi^2] = 2 * N_bins.
 
     FFT convention: X(f) = rfft(x) * dt (continuous FT approximation)
     PSD convention: one-sided, so S_n has units of 1/Hz
@@ -155,8 +154,9 @@ class GaussianFDLikelihood(bilby.core.likelihood.Likelihood):
                 self._debug_print(f"FAIL[resid] {ifo}: params={self.parameters}")
                 return -np.inf
 
-            # Factor of 4 for standard GW inner product with one-sided PSD
-            logL += -4.0 * np.sum((np.abs(resid)**2) / Sn_band) * df
+            # Whittle likelihood: divide by (S_n * df) to match noise generation convention
+            # where E[|n(f)|^2] = S_n * df. This gives E[chi^2] = 2 * N_bins.
+            logL += -2.0 * np.sum((np.abs(resid)**2) / (Sn_band * df))
 
         # Final check on logL
         if not np.isfinite(logL):
