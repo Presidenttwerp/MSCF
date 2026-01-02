@@ -205,20 +205,15 @@ def run_injection_test(
         N_window=N_orig  # Window only first N_orig samples (matching data preparation)
     )
 
-    # Priors centered on injected values with reasonable width
+    # Fixed uniform priors for proper SBC/coverage testing
+    # NO truth-centering - priors must be independent of injected values
     priors = bilby.core.prior.PriorDict()
-    priors["A"] = bilby.core.prior.LogUniform(A_inj / 100, A_inj * 100, "A")
-    priors["Mf"] = bilby.core.prior.TruncatedGaussian(
-        mu=Mf_inj, sigma=5.0, minimum=Mf_inj - 15, maximum=Mf_inj + 15, name="Mf"
-    )
-    priors["chi"] = bilby.core.prior.TruncatedGaussian(
-        mu=chi_inj, sigma=0.1, minimum=0.0, maximum=0.99, name="chi"
-    )
+    priors["A"] = bilby.core.prior.LogUniform(1e-24, 1e-19, "A")  # Wide log-uniform
+    priors["Mf"] = bilby.core.prior.Uniform(50.0, 85.0, "Mf")  # Solar masses
+    priors["chi"] = bilby.core.prior.Uniform(0.0, 0.99, "chi")  # Dimensionless spin
     priors["phi"] = bilby.core.prior.Uniform(0, 2 * np.pi, "phi")
-    # t0 prior: segment-relative, allow ±5 ms around injected value
-    priors["t0"] = bilby.core.prior.Uniform(
-        max(0, t0_inj - 0.005), t0_inj + 0.005, "t0"
-    )
+    # t0 prior: segment-relative, fixed window
+    priors["t0"] = bilby.core.prior.Uniform(0.0, 0.010, "t0")  # 0-10 ms
 
     if seed is not None:
         np.random.seed(seed + 1000)
