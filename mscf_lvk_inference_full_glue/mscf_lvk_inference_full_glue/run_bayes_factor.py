@@ -126,12 +126,15 @@ def main():
         np.random.seed(args.seed)
 
     # Run nested sampling with proper convergence settings
+    # Using multi-ellipsoid bounds + slice sampling for better handling of
+    # sharp/narrow likelihood structures (e.g., strong echo signals)
     sampler_kwargs = dict(
         sampler="dynesty",
         nlive=800,
         dlogz=0.1,           # Stop when remaining evidence < 0.1 (tight convergence)
-        sample="rwalk",       # Random walk sampling (robust for multimodal)
-        walks=50,             # Number of random walk steps
+        bound="multi",        # Multi-ellipsoid bounding (better for narrow peaks)
+        sample="rslice",      # Random slice sampling (more robust than rwalk)
+        slices=10,            # Number of slice steps (for slice samplers)
         check_point_plot=False,  # Disable plotting to avoid numpy 2.x compat issue
         resume=False,
     )
@@ -143,11 +146,20 @@ def main():
         outdir=args.resultdir, label=label0,
         **sampler_kwargs
     )
+    # Report invalid eval count for H0
+    print(f"H0 NaN/Inf count: {like0.nan_inf_count} / {like0.eval_count} "
+          f"({100*like0.nan_inf_count/max(1,like0.eval_count):.2f}%)")
+    print(f"H0 fail breakdown: {like0.fail_counts}")
+
     result1 = bilby.run_sampler(
         likelihood=like1, priors=pri1,
         outdir=args.resultdir, label=label1,
         **sampler_kwargs
     )
+    # Report invalid eval count for H1
+    print(f"H1 NaN/Inf count: {like1.nan_inf_count} / {like1.eval_count} "
+          f"({100*like1.nan_inf_count/max(1,like1.eval_count):.2f}%)")
+    print(f"H1 fail breakdown: {like1.fail_counts}")
 
     logBF = result1.log_evidence - result0.log_evidence
     print(f"ln BF_10 = {logBF:.3f} ; log10 BF_10 = {logBF/np.log(10):.3f}")

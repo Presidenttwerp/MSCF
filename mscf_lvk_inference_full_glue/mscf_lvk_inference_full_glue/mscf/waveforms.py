@@ -97,18 +97,31 @@ def ringdown_fd_qnm(t, A, Mf, chi, phi, t0):
     f0, tau = qnm_220_freq_tau(Mf, chi)
     return ringdown_fd(t, A, f0, tau, phi, t0)
 
-def msfc_echo_transfer_function(f, Mf, chi, R0, f_cut, roll, phi0, Rb0=0.5, T0=1.0):
+def msfc_echo_transfer_function(f, Mf, chi, R0, f_cut, roll, phi0, Rb0=0.5, T0=1.0, denom_floor=1e-6):
     """
     Frequency-domain cavity echo transfer function:
 
       EchoTF(f) = T0*Rw(f) / (1 - Rb0*Rw(f)*exp(i 2π f Δt_echo))
 
     Δt_echo is derived from (Mf,chi). Rb0 and T0 are fixed to avoid degeneracy.
+
+    A floor is applied to |denom| to prevent numerical poles when the cavity
+    approaches perfect resonance. This caps the maximum gain of the transfer
+    function to ~1/denom_floor.
     """
     dt_echo = delta_t_echo_seconds(Mf, chi)
     Rw = Rw_of_f(f, R0=R0, f_cut=f_cut, roll=roll, phi0=phi0)
     phase = np.exp(1j * 2*np.pi * f * dt_echo)
     denom = (1.0 - float(Rb0) * Rw * phase)
+
+    # Apply floor to prevent division by near-zero (numerical poles)
+    # This caps the maximum transfer function gain
+    abs_denom = np.abs(denom)
+    too_small = abs_denom < denom_floor
+    if np.any(too_small):
+        # Preserve phase, but floor the magnitude
+        denom = np.where(too_small, denom / abs_denom * denom_floor, denom)
+
     return float(T0) * Rw / denom
 
 def ringdown_plus_echo_fd(t, params, Rb0=0.5, T0=1.0):
