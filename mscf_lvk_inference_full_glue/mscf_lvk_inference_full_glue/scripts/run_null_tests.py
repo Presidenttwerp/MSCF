@@ -17,13 +17,15 @@ import sys
 # GW150914 GPS time
 GW150914_GPS = 1126259462.4
 
-# Choose 5 off-source times ~1000-5000s before the event
+# Choose 10 off-source times ~1000-10000s before the event
 # These times have no known GW signals
-OFF_SOURCE_OFFSETS = [-1000, -2000, -3000, -4000, -5000]  # seconds before GW150914
+OFF_SOURCE_OFFSETS = [-1000, -2000, -3000, -4000, -5000,
+                      -6000, -7000, -8000, -9000, -10000]  # seconds before GW150914
 
 def main():
     p = argparse.ArgumentParser()
     p.add_argument("--n-segments", type=int, default=5, help="Number of off-source segments")
+    p.add_argument("--start-segment", type=int, default=0, help="Start from this segment index (0-based)")
     p.add_argument("--outdir", type=str, default="out_null")
     p.add_argument("--seed-base", type=int, default=42, help="Base seed for reproducibility")
     p.add_argument("--dry-run", action="store_true", help="Print commands without executing")
@@ -31,9 +33,10 @@ def main():
 
     os.makedirs(args.outdir, exist_ok=True)
 
-    n_segs = min(args.n_segments, len(OFF_SOURCE_OFFSETS))
+    start_idx = args.start_segment
+    end_idx = min(args.start_segment + args.n_segments, len(OFF_SOURCE_OFFSETS))
 
-    for i in range(n_segs):
+    for i in range(start_idx, end_idx):
         offset = OFF_SOURCE_OFFSETS[i]
         gps = GW150914_GPS + offset
         seg_name = f"null_seg{i+1}"
@@ -41,7 +44,7 @@ def main():
         os.makedirs(seg_outdir, exist_ok=True)
 
         print(f"\n{'='*60}")
-        print(f"NULL TEST {i+1}/{n_segs}: GPS {gps:.1f} (offset {offset}s from GW150914)")
+        print(f"NULL TEST {i+1}/{end_idx}: GPS {gps:.1f} (offset {offset}s from GW150914)")
         print(f"{'='*60}")
 
         # Step 1: Fetch data and PSD for this off-source segment

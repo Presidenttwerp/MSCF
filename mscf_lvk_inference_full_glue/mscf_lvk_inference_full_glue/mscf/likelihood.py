@@ -21,12 +21,19 @@ class GaussianFDLikelihood(bilby.core.likelihood.Likelihood):
     PSD convention: one-sided, so S_n has units of 1/Hz
     """
 
-    def __init__(self, t, data_dict, psd_dict, model="H0_ringdown"):
+    def __init__(self, t, data_dict, psd_dict, model="H0_ringdown", fmin=30.0, fmax=1024.0,
+                 window=None, planck_eps_start=0.01, planck_eps_end=0.1, N_window=None):
         super().__init__(parameters={})
         self.t = np.asarray(t, dtype=float)
         self.data = data_dict  # dict: ifo -> (f, d_f)
         self.psd = psd_dict    # dict: ifo -> (f, Sn_f)
         self.model = model
+        self.fmin = fmin  # Configurable frequency band limits
+        self.fmax = fmax
+        self.window = window  # Window type for waveform generation
+        self.planck_eps_start = planck_eps_start
+        self.planck_eps_end = planck_eps_end
+        self.N_window = N_window  # Window length for zero-padded data
         self.nan_inf_count = 0  # Track how often we hit invalid values
         self.eval_count = 0     # Track total likelihood evaluations
         self.debug_max_prints = 10  # Limit debug output
@@ -57,11 +64,23 @@ class GaussianFDLikelihood(bilby.core.likelihood.Likelihood):
         p = self.parameters
         if self.model == "H0_ringdown":
             # GR-consistent: derive f0, tau from (Mf, chi)
-            f, H = ringdown_fd_qnm(self.t, p["A"], p["Mf"], p["chi"], p["phi"], p["t0"])
+            f, H = ringdown_fd_qnm(
+                self.t, p["A"], p["Mf"], p["chi"], p["phi"], p["t0"],
+                window=self.window,
+                planck_eps_start=self.planck_eps_start,
+                planck_eps_end=self.planck_eps_end,
+                N_window=self.N_window
+            )
         elif self.model == "H1_echo":
             # H1 uses same GR ringdown + echo transfer function
             params = {k: p[k] for k in ["A","Mf","chi","phi","t0","R0","f_cut","roll","phi0"]}
-            f, H = ringdown_plus_echo_fd(self.t, params)
+            f, H = ringdown_plus_echo_fd(
+                self.t, params,
+                window=self.window,
+                planck_eps_start=self.planck_eps_start,
+                planck_eps_end=self.planck_eps_end,
+                N_window=self.N_window
+            )
         else:
             raise ValueError("Unknown model")
         # ensure f matches provided grid
@@ -87,9 +106,8 @@ class GaussianFDLikelihood(bilby.core.likelihood.Likelihood):
             d = d[1:]
             Sn = Sn[1:]
 
-            # Band-limit: only fit 30-1024 Hz
-            fmin, fmax = 30.0, 1024.0
-            band_mask = (f >= fmin) & (f <= fmax)
+            # Band-limit: use configurable frequency bounds
+            band_mask = (f >= self.fmin) & (f <= self.fmax)
 
             df = f[1] - f[0]
             h_full = self._waveform(np.concatenate(([0.0], f)))  # build on full grid, then slice

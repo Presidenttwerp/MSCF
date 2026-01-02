@@ -78,24 +78,137 @@ def tukey_window(N, alpha=0.1):
     w[right] = 0.5 * (1 - np.cos(2 * np.pi * (N - 1 - n[right]) / (alpha * N)))
     return w
 
-def ringdown_fd(t, A, f0, tau, phi, t0, taper_alpha=0.1):
-    """Return frequency grid f and complex FFT of ringdown time series (with Tukey taper)."""
+
+def planck_taper(N, epsilon_start=0.01, epsilon_end=0.1):
+    """
+    Planck-taper window.
+
+    The Planck taper is C^infinity smooth (infinitely differentiable) and
+    provides better spectral leakage suppression than Tukey.
+
+    Parameters
+    ----------
+    N : int
+        Window length
+    epsilon_start : float
+        Fraction of window for left ramp-up (0 < epsilon < 0.5)
+    epsilon_end : float
+        Fraction of window for right ramp-down (0 < epsilon < 0.5)
+
+    Returns
+    -------
+    w : ndarray
+        Window values in [0, 1]
+    """
+    w = np.ones(N)
+
+    # Left taper (rising edge)
+    n_left = int(epsilon_start * N)
+    if n_left > 0:
+        for i in range(1, n_left):
+            x = epsilon_start * (1.0 / (i / N) + 1.0 / (i / N - epsilon_start))
+            w[i] = 1.0 / (1.0 + np.exp(x))
+        w[0] = 0.0
+
+    # Right taper (falling edge)
+    n_right = int(epsilon_end * N)
+    if n_right > 0:
+        for i in range(N - n_right, N - 1):
+            x = epsilon_end * (1.0 / (1.0 - i / N) + 1.0 / (1.0 - i / N - epsilon_end))
+            w[i] = 1.0 / (1.0 + np.exp(x))
+        w[N - 1] = 0.0
+
+    return w
+
+def ringdown_fd(t, A, f0, tau, phi, t0,
+                taper_alpha=0.1,
+                window=None,
+                planck_eps_start=0.01,
+                planck_eps_end=0.1,
+                N_window=None):
+    """
+    Return frequency grid f and complex FFT of ringdown time series.
+
+    Parameters
+    ----------
+    t : array
+        Time array (may be zero-padded)
+    A, f0, tau, phi, t0 : float
+        Ringdown parameters
+    taper_alpha : float
+        Tukey window alpha (fraction tapered). Only used if window is None or "tukey".
+    window : str or None
+        Window type: None (default Tukey), "tukey", "planck", or "none"
+    planck_eps_start, planck_eps_end : float
+        Planck taper fractions (only used if window="planck")
+    N_window : int or None
+        If set, apply window only to first N_window samples (for zero-padded data).
+        Remaining samples are set to zero. If None, window all samples.
+
+    Returns
+    -------
+    f : array
+        Frequency grid
+    Y : array
+        Complex FFT of windowed ringdown
+    """
     y = ringdown_time_series(t, A, f0, tau, phi, t0)
     dt = t[1] - t[0]
-    w = tukey_window(len(y), alpha=taper_alpha)
-    Y = np.fft.rfft(y * w) * dt  # approx continuous FT convention
+    N = len(y)
+
+    # Determine window length
+    N_win = N_window if N_window is not None else N
+
+    # Select window (applied to N_win samples)
+    if window is None:
+        # Default: Tukey for backward compatibility
+        w = tukey_window(N_win, alpha=taper_alpha) if (taper_alpha and taper_alpha > 0) else None
+    elif window == "tukey":
+        w = tukey_window(N_win, alpha=taper_alpha)
+    elif window == "planck":
+        w = planck_taper(N_win, epsilon_start=planck_eps_start, epsilon_end=planck_eps_end)
+    elif window == "none":
+        w = None
+    else:
+        raise ValueError(f"Unknown window={window}")
+
+    if w is not None:
+        if N_window is not None and N_window < N:
+            # Apply window to first N_window samples, zero the rest
+            y_windowed = np.zeros(N)
+            y_windowed[:N_win] = y[:N_win] * w
+            y = y_windowed
+        else:
+            y = y * w
+
+    Y = np.fft.rfft(y) * dt  # approx continuous FT convention
     f = np.fft.rfftfreq(len(t), d=dt)
     return f, Y
 
 
-def ringdown_fd_qnm(t, A, Mf, chi, phi, t0):
+def ringdown_fd_qnm(t, A, Mf, chi, phi, t0,
+                    window=None, planck_eps_start=0.01, planck_eps_end=0.1,
+                    N_window=None):
     """
     GR-consistent ringdown in frequency domain.
 
     Derives f0 and tau from (Mf, chi) using Berti et al. QNM fits.
+
+    Parameters
+    ----------
+    window : str or None
+        Window type: None (default Tukey), "tukey", "planck", or "none"
+    planck_eps_start, planck_eps_end : float
+        Planck taper fractions (only used if window="planck")
+    N_window : int or None
+        If set, apply window only to first N_window samples (for zero-padded data).
     """
     f0, tau = qnm_220_freq_tau(Mf, chi)
-    return ringdown_fd(t, A, f0, tau, phi, t0)
+    return ringdown_fd(t, A, f0, tau, phi, t0,
+                       window=window,
+                       planck_eps_start=planck_eps_start,
+                       planck_eps_end=planck_eps_end,
+                       N_window=N_window)
 
 def msfc_echo_transfer_function(f, Mf, chi, R0, f_cut, roll, phi0, Rb0=0.5, T0=1.0, denom_floor=1e-6):
     """
@@ -124,7 +237,9 @@ def msfc_echo_transfer_function(f, Mf, chi, R0, f_cut, roll, phi0, Rb0=0.5, T0=1
 
     return float(T0) * Rw / denom
 
-def ringdown_plus_echo_fd(t, params, Rb0=0.5, T0=1.0):
+def ringdown_plus_echo_fd(t, params, Rb0=0.5, T0=1.0,
+                          window=None, planck_eps_start=0.01, planck_eps_end=0.1,
+                          N_window=None):
     """
     Build H_total(f) = H_ring(f) + H_ring(f)*EchoTF(f).
 
@@ -133,12 +248,23 @@ def ringdown_plus_echo_fd(t, params, Rb0=0.5, T0=1.0):
     params dict must include:
       Ringdown: A, Mf, chi, phi, t0
       Echo:     R0, f_cut, roll, phi0
+
+    Parameters
+    ----------
+    window : str or None
+        Window type: None (default Tukey), "tukey", "planck", or "none"
+    planck_eps_start, planck_eps_end : float
+        Planck taper fractions (only used if window="planck")
+    N_window : int or None
+        If set, apply window only to first N_window samples (for zero-padded data).
     """
     # GR-consistent ringdown from (Mf, chi)
     f, Hring = ringdown_fd_qnm(
         t,
         A=params["A"], Mf=params["Mf"], chi=params["chi"],
-        phi=params["phi"], t0=params["t0"]
+        phi=params["phi"], t0=params["t0"],
+        window=window, planck_eps_start=planck_eps_start, planck_eps_end=planck_eps_end,
+        N_window=N_window
     )
     EchoTF = msfc_echo_transfer_function(
         f, Mf=params["Mf"], chi=params["chi"],
