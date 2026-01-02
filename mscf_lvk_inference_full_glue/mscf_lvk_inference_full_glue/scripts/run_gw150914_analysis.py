@@ -293,9 +293,14 @@ def run_robustness_sweep(args):
                     "fmax": fmax,
                     "band_label": band_label,
                     "ln_BF": result.get("ln_BF"),
+                    "ln_BF_err": result.get("ln_BF_err"),
                     "log10_BF": result.get("log10_BF"),
                     "log_evidence_H0": result.get("log_evidence_H0"),
                     "log_evidence_H1": result.get("log_evidence_H1"),
+                    "logZerr_H0": result.get("logZerr_H0"),
+                    "logZerr_H1": result.get("logZerr_H1"),
+                    "ncall_H0": result.get("ncall_H0"),
+                    "ncall_H1": result.get("ncall_H1"),
                 }
                 results.append(result_entry)
 

@@ -182,25 +182,37 @@ def main():
     print(f"H1 NaN/Inf: {like1.nan_inf_count}/{like1.eval_count}")
 
     logBF = result1.log_evidence - result0.log_evidence
+    # Propagate evidence uncertainty: delta_BF = sqrt(err0^2 + err1^2)
+    logBF_err = np.sqrt(result0.log_evidence_err**2 + result1.log_evidence_err**2)
+
     print(f"\n{'='*60}")
     print(f"GATED ANALYSIS RESULT")
     print(f"{'='*60}")
     print(f"Event: {args.event}")
     print(f"Gate: t_merger + {args.t_start*1000:.0f} ms, duration {segment_duration*1000:.0f} ms")
-    print(f"ln BF_10 = {logBF:.3f}")
+    print(f"ln BF_10 = {logBF:.3f} +/- {logBF_err:.3f}")
     print(f"log10 BF_10 = {logBF/np.log(10):.3f}")
+    print(f"logZ_H0 = {result0.log_evidence:.2f} +/- {result0.log_evidence_err:.2f}")
+    print(f"logZ_H1 = {result1.log_evidence:.2f} +/- {result1.log_evidence_err:.2f}")
     print(f"{'='*60}")
 
-    # Save summary
+    # Save summary with evidence uncertainties and sampler diagnostics
     summary = {
         "event": args.event,
         "gps_merger": args.gps,
         "t_start_ms": args.t_start * 1000,
         "segment_duration_ms": segment_duration * 1000,
         "ln_BF": logBF,
+        "ln_BF_err": logBF_err,
         "log10_BF": logBF / np.log(10),
         "log_evidence_H0": result0.log_evidence,
         "log_evidence_H1": result1.log_evidence,
+        "logZerr_H0": result0.log_evidence_err,
+        "logZerr_H1": result1.log_evidence_err,
+        "ncall_H0": int(result0.num_likelihood_evaluations),
+        "ncall_H1": int(result1.num_likelihood_evaluations),
+        "sampling_efficiency_H0": float(result0.sampling_efficiency) if hasattr(result0, 'sampling_efficiency') else None,
+        "sampling_efficiency_H1": float(result1.sampling_efficiency) if hasattr(result1, 'sampling_efficiency') else None,
     }
     with open(os.path.join(args.resultdir, f"{args.event}_bf_summary.json"), "w") as f:
         json.dump(summary, f, indent=2)
