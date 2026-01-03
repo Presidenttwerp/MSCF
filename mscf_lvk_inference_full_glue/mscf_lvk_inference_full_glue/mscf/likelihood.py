@@ -2,6 +2,8 @@ import numpy as np
 import bilby
 
 from .waveforms import ringdown_fd, ringdown_fd_qnm, ringdown_plus_echo_fd
+from .echo_waveform import apply_mscf_echoes
+from .mscf_echo_train import apply_mscf_echo_train_fd
 
 class GaussianFDLikelihood(bilby.core.likelihood.Likelihood):
     """
@@ -80,6 +82,71 @@ class GaussianFDLikelihood(bilby.core.likelihood.Likelihood):
                 planck_eps_end=self.planck_eps_end,
                 N_window=self.N_window
             )
+        elif self.model == "H1_mscf":
+            # MSCF-constrained echo model: only R0, phi0 free
+            # Echo delay is deterministic from (Mf, chi) via MSCF physics
+            # No free spectral fitting parameters (f_cut, roll) - this prevents overfitting
+            f, H0 = ringdown_fd_qnm(
+                self.t, p["A"], p["Mf"], p["chi"], p["phi"], p["t0"],
+                window=self.window,
+                planck_eps_start=self.planck_eps_start,
+                planck_eps_end=self.planck_eps_end,
+                N_window=self.N_window
+            )
+            # Apply MSCF echo modulation: H1 = H0 * (1 + echo_train)
+            H = apply_mscf_echoes(
+                H0_f=H0,
+                freqs=f,
+                Mf_solar=p["Mf"],
+                chi=p["chi"],
+                R0=p["R0"],
+                phi0=p["phi0"],
+                necho=2
+            )
+        elif self.model == "H1_mscf_train":
+            # MSCF two-surface echo train: only R1, phi_reflect free
+            # Timing (t_echo, delta_t) and amplitudes are DETERMINISTIC from Mf via MSCF physics
+            # This kills the "generic smooth spectral fitter" failure mode
+            #
+            # Physics:
+            #   t_echo = (r_s/c) * ln(r_s/l_P)  - primary delay
+            #   delta_t = r_s/c                  - secondary spacing
+            #   A1 = R1, A2 = (1-R1)^2, An = (1-R1)^2 * R1^(n-2)
+            #
+            # H1(f) = H0(f) * T(f) where T(f) = 1 + sum_k A_k * exp(i*(2*pi*f*t_k + phi_reflect))
+            f, H0 = ringdown_fd_qnm(
+                self.t, p["A"], p["Mf"], p["chi"], p["phi"], p["t0"],
+                window=self.window,
+                planck_eps_start=self.planck_eps_start,
+                planck_eps_end=self.planck_eps_end,
+                N_window=self.N_window
+            )
+            # Apply MSCF two-surface echo train
+            H = apply_mscf_echo_train_fd(
+                H0_f=H0,
+                freqs=f,
+                M_solar=p["Mf"],
+                R1=p["R1"],
+                phi_reflect=p["phi_reflect"],
+                N_echo=6
+            )
+        elif self.model == "H1_mscf_train_incoh":
+            # INCOHERENT version: separate R1, phi_reflect per IFO
+            # This is the null hypothesis for the coherence test.
+            # If noise prefers this over the coherent model, we have a false positive.
+            #
+            # Parameters: R1_H1, phi_reflect_H1, R1_L1, phi_reflect_L1
+            # (or more generally R1_{ifo}, phi_reflect_{ifo})
+            #
+            # This model is handled specially in log_likelihood() below.
+            # Here we just return the base ringdown.
+            f, H = ringdown_fd_qnm(
+                self.t, p["A"], p["Mf"], p["chi"], p["phi"], p["t0"],
+                window=self.window,
+                planck_eps_start=self.planck_eps_start,
+                planck_eps_end=self.planck_eps_end,
+                N_window=self.N_window
+            )
         else:
             raise ValueError("Unknown model")
         # ensure f matches provided grid
@@ -96,6 +163,8 @@ class GaussianFDLikelihood(bilby.core.likelihood.Likelihood):
     def log_likelihood(self):
         self.eval_count += 1
         logL = 0.0
+        p = self.parameters
+
         for ifo in self.data:
             f, d = self.data[ifo]
             _, Sn = self.psd[ifo]
@@ -109,7 +178,25 @@ class GaussianFDLikelihood(bilby.core.likelihood.Likelihood):
             band_mask = (f >= self.fmin) & (f <= self.fmax)
 
             df = f[1] - f[0]
-            h_full = self._waveform(np.concatenate(([0.0], f)))  # build on full grid, then slice
+
+            # Handle incoherent model specially: apply per-IFO echo parameters
+            if self.model == "H1_mscf_train_incoh":
+                # Get base ringdown waveform
+                h_full = self._waveform(np.concatenate(([0.0], f)))
+                # Apply per-IFO echo train
+                R1_ifo = p.get(f"R1_{ifo}", p.get("R1", 0.0))
+                phi_ifo = p.get(f"phi_reflect_{ifo}", p.get("phi_reflect", 0.0))
+                h_full = apply_mscf_echo_train_fd(
+                    H0_f=h_full,
+                    freqs=np.concatenate(([0.0], f)),
+                    M_solar=p["Mf"],
+                    R1=R1_ifo,
+                    phi_reflect=phi_ifo,
+                    N_echo=6
+                )
+            else:
+                h_full = self._waveform(np.concatenate(([0.0], f)))  # build on full grid, then slice
+
             h = h_full[1:]
 
             # Apply band mask to all arrays
