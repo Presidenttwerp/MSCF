@@ -1,5 +1,7 @@
 # Matter-Space Coupling Framework: Computation Repository
 
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.18648268.svg)](https://doi.org/10.5281/zenodo.18648268)
+
 **Author:** Ishay Roland
 
 This repository contains the computation scripts, precomputed results, and
