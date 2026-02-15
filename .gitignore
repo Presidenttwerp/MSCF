@@ -1,0 +1,36 @@
+__pycache__/
+*.pyc
+.pytest_cache/
+.venv/
+.env
+.DS_Store
+*.egg-info/
+*.swp
+*.swo
+*.log
+
+# Local working directories (not part of publication repo)
+mscf-medium-tests/
+mscf_echo_interference/
+mscf_echo_search/
+mscf_grav_atom/
+mscf_lvk_inference_full_glue/
+mscf_lvk_inference_full_glue.zip
+mscf_lvk_inference_minimal/
+mscf_lvk_inference_minimal.zip
+mscf_observational_tests/
+mscf_pbh_dm/
+mscf_ringdown/
+mscf_spectrogram/
+mscf_superradiance/
+mscf_qgp_transport/
+mscf-remnant-abundance/
+mscf_amplitude_inversion/
+.claude/
+
+# Paper text extractions (IP - do not publish)
+paper/*.txt
+
+# Local analysis scripts (not part of publication)
+code/cmb/bispectrum_bounce.py
+results/bispectrum/
