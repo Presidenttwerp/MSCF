@@ -28,8 +28,15 @@ mscf-remnant-abundance/
 mscf_amplitude_inversion/
 .claude/
 
-# Paper text extractions (IP - do not publish)
+# Paper (do not publish)
 paper/*.txt
+paper/*.pdf
+
+# Derived echo pipeline: generated results (reproducible from scripts)
+mscf_derived_echo/results/*.npz
+mscf_derived_echo/results/*.png
+mscf_derived_echo/results/cache/
+mscf_derived_echo/mscf_derived/__pycache__/
 
 # Local analysis scripts (not part of publication)
 code/cmb/bispectrum_bounce.py

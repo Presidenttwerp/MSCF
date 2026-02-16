@@ -1,16 +1,17 @@
 #!/usr/bin/env python3
 """
-Figure 3: Echo amplitude inversion, the MSCF discriminant.
+Figure 3: Echo amplitude trains — MSCF discriminant.
 
-Generic ECO models (single reflective surface) produce monotonically
-decaying echo trains: A1 > A2 > A3 > ...
-
-MSCF (two-surface interior) produces an inverted pattern: A2 > A1,
-because A1 is a weak horizon reflection while A2 is a strong barrier
-reflection after full cavity transit.
+Three curves:
+1. Generic ECO (single reflective surface): monotonic, gradual decay
+2. Classical MSCF (derived): strong first echo, steep drop by factor ~11 per echo
+   (primary prediction — barrier nearly transparent at QNM, |R_b|^2 ~ 0.008)
+3. Quantum MSCF (dashed): possible inversion if R_1 > 0 at horizon
+   (secondary possibility — horizon acquires reflectivity from quantum corrections)
 
 References:
     MSCF v2.1.7, Section XI.C, Figure 3.
+    Derived greybody factors: mscf_derived_echo/ pipeline results.
 
 Output:
     paper/figures/fig3_echo_inversion.png
@@ -46,58 +47,100 @@ def main() -> None:
     N_echoes = 8
     n = np.arange(1, N_echoes + 1)
 
-    # Generic single-surface ECO: monotonic geometric decay
+    # ---------------------------------------------------------------
+    # 1. Generic single-surface ECO: monotonic geometric decay
+    #    R ~ 0.65 typical for firewall/fuzzball models
+    # ---------------------------------------------------------------
     R_generic = 0.65
-    A_generic_0 = 1.0
-    A_generic = A_generic_0 * R_generic ** (n - 1)
+    A_generic = R_generic ** (n - 1)
 
-    # MSCF two-surface (Theorem 11.1: T = 1 - R1, amplitude convention)
-    R_horizon = 0.15
-    T_horizon = 1 - R_horizon  # amplitude transmission (paper Eq. 34)
-    R_barrier = 1.0            # total reflection at inversion barrier
+    # ---------------------------------------------------------------
+    # 2. Classical MSCF (derived): barrier nearly transparent at QNM
+    #    From greybody computation: |T_b| = 0.996, |R_b| = 0.087
+    #    a_n = |T_b| * |R_b|^{n-1}
+    #    Ratio A1/A2 ~ 11.5
+    # ---------------------------------------------------------------
+    Tb = 0.996   # barrier transmissivity at QNM
+    Rb = 0.087   # barrier reflectivity at QNM
+    A_classical = Tb * Rb ** (n - 1)
 
-    A_mscf = np.zeros(N_echoes)
-    A_mscf[0] = R_horizon                      # A1: horizon reflection
-    A_mscf[1] = T_horizon**2 * R_barrier       # A2: transmit-reflect-transmit
+    # ---------------------------------------------------------------
+    # 3. Quantum MSCF (dashed): horizon acquires reflectivity R_1 > 0
+    #    from quantum corrections. This restores the inversion signature.
+    #    A_1 = R_1 (horizon reflection, weak)
+    #    A_2 = T_1^2 * R_barrier (transmit, reflect off barrier, transmit back)
+    #    A_n>2 = A_2 * R_1^{n-2}
+    # ---------------------------------------------------------------
+    R1_quantum = 0.15  # illustrative horizon reflectivity
+    T1_quantum = 1.0 - R1_quantum  # amplitude transmission
+    A_quantum = np.zeros(N_echoes)
+    A_quantum[0] = R1_quantum                        # A1: horizon reflection
+    A_quantum[1] = T1_quantum**2                     # A2: full cavity transit
     for i in range(2, N_echoes):
-        A_mscf[i] = A_mscf[1] * R_horizon ** (i - 1)
+        A_quantum[i] = A_quantum[1] * R1_quantum ** (i - 1)
 
-    A_generic = A_generic / A_generic[0]
-    A_mscf = A_mscf / A_mscf.max()
+    # Normalize all to their own max for comparison
+    A_generic_norm = A_generic / A_generic[0]
+    A_classical_norm = A_classical / A_classical[0]
+    A_quantum_norm = A_quantum / A_quantum.max()
 
+    # ---------------------------------------------------------------
+    # Plot
+    # ---------------------------------------------------------------
     fig, ax = plt.subplots(figsize=(8, 5.5))
 
     C_GEN = '#888888'
-    C_MSCF = '#D94A4A'
-    C_MSCF_DARK = '#A03030'
+    C_CLASS = '#2266AA'
+    C_QUANT = '#D94A4A'
 
-    ax.plot(n, A_generic, 'o--', color=C_GEN, ms=10, lw=1.8,
+    # Generic ECO
+    ax.plot(n, A_generic_norm, 'o--', color=C_GEN, ms=10, lw=1.8,
             markeredgecolor='white', markeredgewidth=1.2,
             label='Generic ECO (single surface)', zorder=5)
 
-    ax.plot(n, A_mscf, 's-', color=C_MSCF, ms=11, lw=2.2,
+    # Classical MSCF — primary prediction (solid, prominent)
+    ax.plot(n, A_classical_norm, 's-', color=C_CLASS, ms=11, lw=2.5,
             markeredgecolor='white', markeredgewidth=1.2,
-            label='MSCF (two surfaces)', zorder=6)
+            label=r'Classical MSCF ($|R_b|^2 = 0.008$)', zorder=7)
 
-    ax.annotate('',
-                xy=(2, A_mscf[1] + 0.02), xytext=(1, A_mscf[0] + 0.02),
-                arrowprops=dict(arrowstyle='->', color=C_MSCF_DARK, lw=2.5,
-                                connectionstyle='arc3,rad=-0.3'),
-                zorder=10)
-    ax.text(1.5, 0.52, r'$A_2 > A_1$' + '\ninversion',
-            fontsize=12, ha='center', va='center', color=C_MSCF_DARK,
-            fontweight='bold', zorder=20,
-            bbox=dict(boxstyle='round,pad=0.3', fc='#FFF0F0', ec=C_MSCF_DARK,
-                      alpha=0.95, lw=1.5))
+    # Quantum MSCF — secondary possibility (dashed)
+    ax.plot(n, A_quantum_norm, 'D--', color=C_QUANT, ms=9, lw=1.8,
+            markeredgecolor='white', markeredgewidth=1.2,
+            alpha=0.75,
+            label=r'Quantum MSCF ($R_1 > 0$, if present)', zorder=6)
 
-    ax.text(1.3, A_mscf[0] + 0.04, r'$A_1$' + ' (horizon reflection)',
-            fontsize=8, ha='left', va='bottom', color=C_MSCF_DARK, zorder=20,
-            bbox=dict(boxstyle='round,pad=0.15', fc='white', ec='none', alpha=0.8))
-    ax.text(2.55, A_mscf[1] - 0.02, r'$A_2$' + '\n(barrier\nreflection)',
-            fontsize=8, ha='left', va='top', color=C_MSCF_DARK, zorder=20,
-            bbox=dict(boxstyle='round,pad=0.15', fc='white', ec='none', alpha=0.8))
+    # Annotations for classical MSCF
+    ax.annotate(r'$A_1 / A_2 \approx 11$',
+                xy=(2, A_classical_norm[1]),
+                xytext=(3.2, 0.38),
+                arrowprops=dict(arrowstyle='->', color=C_CLASS, lw=1.5,
+                                connectionstyle='arc3,rad=0.2'),
+                fontsize=11, ha='center', va='center', color=C_CLASS,
+                fontweight='bold', zorder=20,
+                bbox=dict(boxstyle='round,pad=0.3', fc='#E8F0FF', ec=C_CLASS,
+                          alpha=0.95, lw=1.2))
 
-    ax.text(3.5, A_generic[2] + 0.05, 'monotonic\ndecay',
+    ax.annotate('steep drop\n(barrier transparent\nat QNM)',
+                xy=(3, A_classical_norm[2]),
+                xytext=(4.5, 0.20),
+                arrowprops=dict(arrowstyle='->', color=C_CLASS, lw=1.0,
+                                connectionstyle='arc3,rad=-0.2'),
+                fontsize=9, ha='center', va='center', color=C_CLASS,
+                style='italic', zorder=20)
+
+    # Annotation for quantum MSCF inversion
+    ax.annotate(r'$A_2 > A_1$',
+                xy=(1.5, (A_quantum_norm[0] + A_quantum_norm[1]) / 2),
+                xytext=(1.1, 0.55),
+                arrowprops=dict(arrowstyle='->', color=C_QUANT, lw=1.2,
+                                connectionstyle='arc3,rad=0.3'),
+                fontsize=10, ha='center', va='center', color=C_QUANT,
+                fontweight='bold', alpha=0.75, zorder=20,
+                bbox=dict(boxstyle='round,pad=0.25', fc='#FFF0F0', ec=C_QUANT,
+                          alpha=0.7, lw=1.0))
+
+    # Generic ECO label
+    ax.text(4.5, A_generic_norm[3] + 0.05, 'gradual\ndecay',
             fontsize=9, ha='center', va='bottom', color=C_GEN,
             style='italic', zorder=20)
 
@@ -112,12 +155,13 @@ def main() -> None:
     leg.set_zorder(20)
     ax.grid(True, alpha=0.15, lw=0.5)
 
+    # Decision rule box at bottom
     ax.text(0.5, 0.02,
-            r'If $A_2 > A_1$: two-surface interior (MSCF)'
+            'Classical MSCF: strong $A_1$, steep decay (primary prediction)'
             r'$\qquad$'
-            r'If $A_1 > A_2 > A_3$: single-surface ECO',
+            'Quantum: inversion $A_2 > A_1$ (if $R_1 > 0$)',
             transform=ax.transAxes,
-            fontsize=9, ha='center', va='bottom', zorder=20,
+            fontsize=8.5, ha='center', va='bottom', zorder=20,
             bbox=dict(boxstyle='round,pad=0.4', fc='#F8F8F8', ec='#888',
                       alpha=0.95, lw=1.0))
 

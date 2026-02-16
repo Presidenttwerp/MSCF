@@ -2,14 +2,14 @@
 """
 Figure 2: Two-surface interior structure of the MSCF black hole.
 
-Left panel: Metric function F(r) = (1 - x_g)(1 - x_g/2) compared to the
+Left panel (a): Metric function F(r) = (1 - x_g)(2 - x_g) compared to the
 Schwarzschild f(r) = 1 - x_g, showing the two zeros (horizon and inversion
-barrier) and the cavity between them.
+barrier) and the cavity between them. C^1 at the horizon: F'(x_g=1) = -1,
+matching Schwarzschild (no kink).
 
-Right panel: Spatial schematic of the three-region interior with echo paths
-illustrating the amplitude inversion (A2 > A1).
-
-Cavity proper distance: 1.285 r_s (computed numerically).
+Right panel (b): Spatial schematic of the three-region interior with echo paths
+showing the derived prediction: A_1 strong (barrier nearly transparent at QNM),
+rapid amplitude decay thereafter.
 
 References:
     MSCF v2.1.7, Sections X and XI, Figure 2.
@@ -46,19 +46,7 @@ plt.rcParams.update({
 })
 
 
-def cavity_integrand(r_over_M: float) -> float:
-    """Integrand for proper cavity length, in units of M."""
-    u = r_over_M
-    F_abs = abs((2.0/u - 1.0) * (1.0 - 1.0/u))
-    return 1.0 / np.sqrt(F_abs) if F_abs > 1e-14 else 0.0
-
-
 def main() -> None:
-    # Compute cavity proper length
-    delta_ell_M, _ = quad(cavity_integrand, 1.001, 1.999)
-    delta_ell_rs = delta_ell_M / 2.0
-    print(f"Cavity proper length: {delta_ell_M:.4f} M = {delta_ell_rs:.4f} r_s")
-
     # Color scheme
     C_EXT = '#4A90D9'
     C_EXT_FILL = '#D6E8F7'
@@ -78,13 +66,21 @@ def main() -> None:
     # ================================================================
     ax = ax_left
 
+    # x_g = r_s / r = 1/u, so u = r/r_s
     u = np.linspace(0.32, 3.5, 2000)
-    F_mscf = (1.0 - 1.0/u) * (1.0 - 1.0/(2.0*u))
-    f_gr = 1.0 - 1.0/u
+    x_g = 1.0 / u
 
-    ext_mask = u >= 1.0
-    cav_mask = (u >= 0.5) & (u <= 1.0)
-    core_mask = u <= 0.5
+    # NEW: F = (1 - x_g)(2 - x_g)
+    # In u coordinates: (1 - 1/u)(2 - 1/u) = (u-1)(2u-1)/u^2
+    F_mscf = (1.0 - x_g) * (2.0 - x_g)
+
+    # Schwarzschild: f = 1 - x_g = 1 - 1/u
+    f_gr = 1.0 - x_g
+
+    # Region masks (in x_g space: exterior x_g<1, cavity 1<x_g<2, core x_g>2)
+    ext_mask = x_g <= 1.0    # u >= 1
+    cav_mask = (x_g >= 1.0) & (x_g <= 2.0)  # 0.5 <= u <= 1
+    core_mask = x_g >= 2.0   # u <= 0.5
 
     ax.fill_between(u[ext_mask], 0, F_mscf[ext_mask],
                     alpha=0.12, color=C_EXT, zorder=0)
@@ -94,22 +90,28 @@ def main() -> None:
                     alpha=0.12, color=C_CORE, zorder=0)
 
     ax.plot(u, F_mscf, color='#1a1a1a', lw=2.5, zorder=5,
-            label=r'MSCF: $F = (1-x_g)(1-x_g/2)$')
+            label=r'MSCF: $F = (1-x_g)(2-x_g)$')
     ax.plot(u, f_gr, color=C_GR, ls='--', lw=1.8, alpha=0.75, zorder=4,
             label=r'GR: $f = 1 - x_g$')
 
     ax.axhline(0, color='black', lw=0.6, zorder=1)
+
+    # Mark the zeros
     ax.plot(1.0, 0, 'o', color='#1a1a1a', ms=9, zorder=8,
             markeredgecolor='white', markeredgewidth=1.5)
     ax.plot(0.5, 0, 's', color='#1a1a1a', ms=9, zorder=8,
             markeredgecolor='white', markeredgewidth=1.5)
-    ax.plot(2.0/3.0, -1.0/8.0, 'x', color=C_CAV, ms=8, mew=2.5, zorder=7)
+
+    # Minimum: F'=0 at x_g=3/2 (u=2/3), F_min = (-1/2)(1/2) = -1/4
+    ax.plot(2.0/3.0, -1.0/4.0, 'x', color=C_CAV, ms=8, mew=2.5, zorder=7)
 
     ax.axvline(1.0, color='#1a1a1a', ls=':', lw=0.8, alpha=0.4, zorder=2)
     ax.axvline(0.5, color='#1a1a1a', ls=':', lw=0.8, alpha=0.4, zorder=2)
 
-    ax.annotate('Horizon\n' + r'$r = r_s$' + '\n' + r'($x_g = 1$)',
-                xy=(1.0, 0), xytext=(1.55, -0.18),
+    # Annotations
+    ax.annotate(r'Horizon ($r = r_s$, $x_g = 1$)' + '\n'
+                r"$C^1$: $F' = f'$ here",
+                xy=(1.0, 0), xytext=(1.55, -0.22),
                 arrowprops=dict(arrowstyle='->', color='#1a1a1a', lw=1.2,
                                 connectionstyle='arc3,rad=-0.2'),
                 fontsize=9, ha='center', va='top', zorder=20,
@@ -117,28 +119,30 @@ def main() -> None:
                           ec='#888', alpha=0.95))
 
     ax.annotate('Inversion barrier\n' + r'$r = M$  ($x_g = 2$)',
-                xy=(0.5, 0), xytext=(0.75, 0.32),
+                xy=(0.5, 0), xytext=(0.75, 0.42),
                 arrowprops=dict(arrowstyle='->', color='#1a1a1a', lw=1.2),
                 fontsize=9, ha='center', va='bottom', zorder=20,
                 bbox=dict(boxstyle='round,pad=0.3', fc='lightyellow',
                           ec='#888', alpha=0.95))
 
-    ax.annotate(r'$F_{\min} = -\frac{1}{8}$',
-                xy=(2.0/3.0, -1.0/8.0), xytext=(1.15, -0.25),
+    ax.annotate(r'$F_{\min} = -\frac{1}{4}$',
+                xy=(2.0/3.0, -1.0/4.0), xytext=(1.15, -0.42),
                 arrowprops=dict(arrowstyle='->', color=C_CAV, lw=1),
                 fontsize=9, color=C_CAV, zorder=20)
 
-    ax.text(2.3, 0.30, r'$\mathbf{F > 0}$' + '\ntimelike',
+    # Region labels
+    ax.text(2.3, 0.55, r'$\mathbf{F > 0}$' + '\ntimelike',
             fontsize=10, ha='center', color=C_EXT, fontweight='bold', zorder=20)
-    ax.text(0.75, -0.06, r'$\mathbf{F < 0}$' + '\nspacelike',
+    ax.text(0.75, -0.10, r'$\mathbf{F < 0}$' + '\nspacelike',
             fontsize=10, ha='center', color=C_CAV, fontweight='bold', zorder=20)
-    ax.text(0.385, 0.08, r'$\mathbf{F > 0}$' + '\ntimelike',
+    ax.text(0.385, 0.12, r'$\mathbf{F > 0}$' + '\ntimelike',
             fontsize=8, ha='center', color='#2D7A3A', fontweight='bold', zorder=20,
             bbox=dict(boxstyle='round,pad=0.15', fc='white', ec='none', alpha=0.7))
 
+    # GR divergence note
     ax.annotate('', xy=(0.34, f_gr[0]-0.02), xytext=(0.34, f_gr[0] + 0.12),
                 arrowprops=dict(arrowstyle='->', color=C_GR, lw=1.5), zorder=20)
-    ax.text(0.56, -0.38, r'GR: $f \to -\infty$' + '\n(singularity)',
+    ax.text(0.56, -0.55, r'GR: $f \to -\infty$' + '\n(singularity)',
             fontsize=9, color=C_GR, ha='center', style='italic', zorder=20,
             bbox=dict(boxstyle='round,pad=0.15', fc='white', ec='none', alpha=0.7))
 
@@ -146,13 +150,13 @@ def main() -> None:
     ax.set_ylabel(r'Metric function', fontsize=13)
     ax.set_title(r'(a) MSCF metric $F(r)$ vs Schwarzschild $f(r)$', fontsize=12)
     ax.set_xlim(0.32, 3.5)
-    ax.set_ylim(-0.45, 0.65)
+    ax.set_ylim(-0.65, 0.85)
     leg = ax.legend(loc='upper right', fontsize=9, framealpha=0.95)
     leg.set_zorder(20)
     ax.grid(True, alpha=0.12, lw=0.5)
 
     # ================================================================
-    # RIGHT PANEL: Spatial schematic
+    # RIGHT PANEL: Spatial schematic — derived echo prediction
     # ================================================================
     ax = ax_right
     ax.set_aspect('equal')
@@ -177,16 +181,23 @@ def main() -> None:
                         ec='#1a1a1a', lw=3.0, ls=(0, (6, 3)), zorder=10)
     ax.add_patch(wall_ring)
 
+    # Horizon label — classically transparent
     ax.text(0, R_HORIZON + 0.25, r'Horizon ($r = r_s$)',
             fontsize=10, ha='center', va='bottom', fontweight='bold', zorder=20,
             bbox=dict(boxstyle='round,pad=0.25', fc='white', ec='#1a1a1a',
                       alpha=0.95, lw=1.5))
+    ax.text(0, R_HORIZON + 0.85,
+            r'classically transparent ($C^1$)',
+            fontsize=9, ha='center', va='bottom', color='#1a1a1a', zorder=20,
+            bbox=dict(boxstyle='round,pad=0.2', fc='#FFFDE8', ec='#CC8800',
+                      alpha=0.95, lw=1.0))
 
     ax.text(0, -(R_WALL + 0.25), r'MSCF wall ($r = M$)',
             fontsize=10, ha='center', va='top', fontweight='bold', zorder=20,
             bbox=dict(boxstyle='round,pad=0.25', fc='white', ec='#1a1a1a',
                       alpha=0.95, lw=1.5, ls='dashed'))
 
+    # Region labels
     ax.text(2.75, 2.75, 'Region I\nExterior\n' + r'$F > 0$',
             fontsize=10, ha='center', va='center', color=C_EXT,
             fontweight='bold', zorder=20,
@@ -220,96 +231,106 @@ def main() -> None:
     x_mid = (x_h + x_w) / 2.0 + 0.4
     y_mid = (y_h + y_w) / 2.0 - 0.3
     ax.text(x_mid, y_mid,
-            r'$\Delta\ell \approx 1.285\, r_s$',
+            r'$\Delta\ell$',
             fontsize=10, ha='left', va='center', color=C_CAV,
             fontweight='bold', zorder=20,
             bbox=dict(boxstyle='round,pad=0.25', fc='white', ec=C_CAV, alpha=0.9))
 
-    # Echo arrows
+    # Echo arrows — derived prediction: A1 STRONG, rapid decay
     C_ECHO = '#CC8800'
+
+    # A1 path: strong first echo — transmits through (nearly transparent horizon),
+    # reflects off barrier, transmits back out
+    a1_angle = 50
+    rad_a1 = np.radians(a1_angle)
     r_in = R_WALL + 0.08
     r_out = R_HORIZON - 0.08
 
-    # A1 path: weak echo reflecting off HORIZON
-    a1_angle = 130
-    rad_a1 = np.radians(a1_angle)
-    x_out_a1 = r_out * np.cos(rad_a1)
-    y_out_a1 = r_out * np.sin(rad_a1)
-    a1_refl = np.radians(a1_angle + 8)
-    x_out_a1r = r_out * np.cos(a1_refl)
-    y_out_a1r = r_out * np.sin(a1_refl)
+    # Ingoing through horizon
+    x_h_a1 = r_out * np.cos(rad_a1)
+    y_h_a1 = r_out * np.sin(rad_a1)
+    x_w_a1 = r_in * np.cos(rad_a1)
+    y_w_a1 = r_in * np.sin(rad_a1)
+    ax.annotate('', xy=(x_w_a1, y_w_a1), xytext=(x_h_a1, y_h_a1),
+                arrowprops=dict(arrowstyle='->', color=C_ECHO, lw=2.5,
+                                alpha=0.9, shrinkA=0, shrinkB=0), zorder=15)
 
-    ax.annotate('', xy=(x_out_a1 * 0.98, y_out_a1 * 0.98),
-                xytext=(x_out_a1 * 1.25, y_out_a1 * 1.25),
-                arrowprops=dict(arrowstyle='->', color=C_ECHO, lw=1.0,
-                                alpha=0.6, shrinkA=0, shrinkB=0), zorder=15)
-    ax.annotate('', xy=(x_out_a1r * 1.25, y_out_a1r * 1.25),
-                xytext=(x_out_a1r * 0.98, y_out_a1r * 0.98),
-                arrowprops=dict(arrowstyle='->', color=C_ECHO, lw=0.8,
-                                alpha=0.5, ls='dashed', shrinkA=0, shrinkB=0),
-                zorder=15)
+    # Reflected off barrier, back out
+    a1_refl = np.radians(a1_angle + 8)
+    x_w_a1r = r_in * np.cos(a1_refl)
+    y_w_a1r = r_in * np.sin(a1_refl)
+    x_h_a1r = r_out * np.cos(a1_refl)
+    y_h_a1r = r_out * np.sin(a1_refl)
+    ax.annotate('', xy=(x_h_a1r, y_h_a1r), xytext=(x_w_a1r, y_w_a1r),
+                arrowprops=dict(arrowstyle='->', color=C_ECHO, lw=2.5,
+                                alpha=0.9, shrinkA=0, shrinkB=0), zorder=15)
+
+    # Exits to exterior
+    ax.annotate('', xy=(x_h_a1r * 1.25, y_h_a1r * 1.25),
+                xytext=(x_h_a1r * 0.98, y_h_a1r * 0.98),
+                arrowprops=dict(arrowstyle='->', color=C_ECHO, lw=2.5,
+                                alpha=0.8, shrinkA=0, shrinkB=0), zorder=15)
 
     a1_lx = R_HORIZON * 1.15 * np.cos(np.radians(a1_angle + 4))
     a1_ly = R_HORIZON * 1.15 * np.sin(np.radians(a1_angle + 4))
-    ax.text(a1_lx, a1_ly, r'$A_1$' + '\n(weak)',
-            fontsize=8, ha='center', va='center', color=C_ECHO,
+    ax.text(a1_lx, a1_ly, r'$A_1$' + '\n(strong)',
+            fontsize=9, ha='center', va='center', color=C_ECHO,
             fontweight='bold', zorder=20,
             bbox=dict(boxstyle='round,pad=0.2', fc='white', ec=C_ECHO,
                       alpha=0.9, lw=0.8))
 
-    # A2 path: strong echo through horizon, off barrier, back out
-    a2_angle = 50
+    # A2 path: weak — same cavity transit but with extra reflection at horizon
+    a2_angle = 130
     rad_a2 = np.radians(a2_angle)
-    x_h_a2 = r_out * np.cos(rad_a2)
-    y_h_a2 = r_out * np.sin(rad_a2)
-    x_w_a2 = r_in * np.cos(rad_a2)
-    y_w_a2 = r_in * np.sin(rad_a2)
-    ax.annotate('', xy=(x_w_a2, y_w_a2), xytext=(x_h_a2, y_h_a2),
-                arrowprops=dict(arrowstyle='->', color=C_ECHO, lw=2.0,
-                                alpha=0.9, shrinkA=0, shrinkB=0), zorder=15)
+    x_out_a2 = r_out * np.cos(rad_a2)
+    y_out_a2 = r_out * np.sin(rad_a2)
 
+    # Show fading arrows for subsequent echoes
     a2_refl = np.radians(a2_angle + 8)
-    x_w_a2r = r_in * np.cos(a2_refl)
-    y_w_a2r = r_in * np.sin(a2_refl)
-    x_h_a2r = r_out * np.cos(a2_refl)
-    y_h_a2r = r_out * np.sin(a2_refl)
-    ax.annotate('', xy=(x_h_a2r, y_h_a2r), xytext=(x_w_a2r, y_w_a2r),
-                arrowprops=dict(arrowstyle='->', color=C_ECHO, lw=2.0,
-                                alpha=0.9, shrinkA=0, shrinkB=0), zorder=15)
+    x_out_a2r = r_out * np.cos(a2_refl)
+    y_out_a2r = r_out * np.sin(a2_refl)
 
-    ax.annotate('', xy=(x_h_a2r * 1.25, y_h_a2r * 1.25),
-                xytext=(x_h_a2r * 0.98, y_h_a2r * 0.98),
-                arrowprops=dict(arrowstyle='->', color=C_ECHO, lw=2.0,
-                                alpha=0.8, shrinkA=0, shrinkB=0), zorder=15)
+    ax.annotate('', xy=(x_out_a2 * 0.98, y_out_a2 * 0.98),
+                xytext=(x_out_a2 * 1.25, y_out_a2 * 1.25),
+                arrowprops=dict(arrowstyle='->', color=C_ECHO, lw=0.8,
+                                alpha=0.4, shrinkA=0, shrinkB=0), zorder=15)
+    ax.annotate('', xy=(x_out_a2r * 1.25, y_out_a2r * 1.25),
+                xytext=(x_out_a2r * 0.98, y_out_a2r * 0.98),
+                arrowprops=dict(arrowstyle='->', color=C_ECHO, lw=0.6,
+                                alpha=0.3, ls='dashed', shrinkA=0, shrinkB=0),
+                zorder=15)
 
     a2_lx = R_HORIZON * 1.15 * np.cos(np.radians(a2_angle + 4))
     a2_ly = R_HORIZON * 1.15 * np.sin(np.radians(a2_angle + 4))
-    ax.text(a2_lx, a2_ly, r'$A_2$' + '\n(strong)',
+    ax.text(a2_lx, a2_ly, r'$A_2, A_3, \ldots$' + '\n(rapid decay)',
             fontsize=8, ha='center', va='center', color=C_ECHO,
-            fontweight='bold', zorder=20,
+            fontweight='bold', zorder=20, alpha=0.7,
             bbox=dict(boxstyle='round,pad=0.2', fc='white', ec=C_ECHO,
-                      alpha=0.9, lw=0.8))
+                      alpha=0.7, lw=0.8))
 
-    # Background echo
+    # Background echo path (faint)
     bg_angle = -130
     rad_bg = np.radians(bg_angle)
     ax.annotate('', xy=(r_out * np.cos(rad_bg), r_out * np.sin(rad_bg)),
                 xytext=(r_in * np.cos(rad_bg), r_in * np.sin(rad_bg)),
-                arrowprops=dict(arrowstyle='->', color=C_ECHO, lw=1.2,
-                                alpha=0.6, shrinkA=0, shrinkB=0), zorder=12)
+                arrowprops=dict(arrowstyle='->', color=C_ECHO, lw=1.0,
+                                alpha=0.4, shrinkA=0, shrinkB=0), zorder=12)
     bg_refl = np.radians(bg_angle + 6)
     ax.annotate('', xy=(r_in * np.cos(bg_refl), r_in * np.sin(bg_refl)),
                 xytext=(r_out * np.cos(bg_refl), r_out * np.sin(bg_refl)),
-                arrowprops=dict(arrowstyle='->', color=C_ECHO, lw=1.2,
-                                alpha=0.5, ls='dashed', shrinkA=0, shrinkB=0),
+                arrowprops=dict(arrowstyle='->', color=C_ECHO, lw=0.8,
+                                alpha=0.3, ls='dashed', shrinkA=0, shrinkB=0),
                 zorder=12)
 
-    ax.text(0, -2.85, r'$\mathbf{A_2 > A_1}$: second echo stronger than first',
-            fontsize=10, ha='center', va='center', color=C_ECHO,
+    # Key prediction box
+    ax.text(0, -2.85,
+            r'$A_1$ strong, rapid decay: $|R_b|^2 \approx 0.008$ at QNM',
+            fontsize=9.5, ha='center', va='center', color=C_ECHO,
             fontweight='bold', zorder=20,
             bbox=dict(boxstyle='round,pad=0.35', fc='#FFF8E8', ec=C_ECHO,
                       alpha=0.95, lw=1.5))
 
+    # Other models note
     box_text = ('Other models:\n'
                 'single surface at\n'
                 r'$r \approx r_s + \varepsilon$' + '\n'
@@ -323,7 +344,7 @@ def main() -> None:
     ax.text(0, -0.65, r'(GR: singularity at $r=0$)',
             fontsize=8, ha='center', color='#777', style='italic', zorder=20)
 
-    ax.set_title(r'(b) Two-surface interior: horizon + inversion barrier',
+    ax.set_title(r'(b) Two-surface interior: classically transparent horizon',
                  fontsize=12)
     ax.axis('off')
 
