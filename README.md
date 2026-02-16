@@ -56,7 +56,7 @@ and the pipeline scripts in `mscf_derived_echo/scripts/`.
 | `code/cmb/phase_correlation_test.py` | Bogoliubov phase variation across CMB k-range: 2.9e-3 rad (null feature, scale separation) | Section IX |
 | `code/verification/algebraic_identities.py` | Self-consistency identity xi/eta^2 = 1 (Theorem 6.4); substrate-matter unity stability table (Theorem 9.8) | Sections VI, IX |
 
-## Derived-Parameter Echo Search (New in v2.2.0)
+## Derived-Parameter Echo Search
 
 Zero-free-parameter echo search using greybody-derived amplitudes. The barrier
 reflectivity R_b(omega) is computed from the Regge-Wheeler scattering problem.
