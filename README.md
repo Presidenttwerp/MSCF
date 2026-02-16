@@ -8,7 +8,7 @@ This repository contains the computation scripts, precomputed results, and
 publication figures cited in:
 
 > Roland, I. (2026). *Matter-Space Coupling Framework: Deriving General
-> Relativity as the IR Limit of Causal Substrate Dynamics* (MSCF v2.2.0).
+> Relativity as the IR Limit of Causal Substrate Dynamics* (MSCF v2.2.1).
 
 Every numerical result in the paper can be reproduced from the scripts in
 `code/` and `mscf_derived_echo/`. Each script is self-contained and
@@ -32,7 +32,7 @@ For the derived-parameter echo search (Section XI), see
 [`mscf_derived_echo/results/RESULTS.md`](mscf_derived_echo/results/RESULTS.md)
 and the pipeline scripts in `mscf_derived_echo/scripts/`.
 
-## Reproducing Figures from MSCF v2.2.0
+## Reproducing Figures from MSCF v2.2.1
 
 | Script | Generates | Paper reference |
 |--------|-----------|-----------------|
@@ -40,13 +40,13 @@ and the pipeline scripts in `mscf_derived_echo/scripts/`.
 | `code/plotting/fig2_two_surface.py` | Figure 2: Two-surface interior structure with F(r) = (1-x_g)(2-x_g) | Section X |
 | `code/plotting/fig3_echo_inversion.py` | Figure 3: Echo amplitude trains — generic ECO, classical MSCF, quantum MSCF | Section XI |
 
-## Reproducing Tables from MSCF v2.2.0
+## Reproducing Tables from MSCF v2.2.1
 
 | Script | Generates | Paper reference |
 |--------|-----------|-----------------|
 | `code/echoes/echo_delay.py` | Table II: Predicted echo delays dt_echo(M, chi) from Kerr tortoise coordinates | Section XI |
 
-## Reproducing Numerical Results from MSCF v2.2.0
+## Reproducing Numerical Results from MSCF v2.2.1
 
 | Script | Result | Paper reference |
 |--------|--------|-----------------|
