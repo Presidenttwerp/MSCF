@@ -4,11 +4,10 @@
 
 **Author:** Ishay Roland
 
-This repository contains the computation scripts, precomputed results, and
-publication figures cited in:
+This repository contains the computation scripts, precomputed results, and publication figures cited in:
 
-> Roland, I. (2026). *Matter-Space Coupling Framework: Deriving General
-> Relativity as the IR Limit of Causal Substrate Dynamics* (MSCF v2.2.1).
+> 1. **Theory:** Roland, I. (2026). *Matter-Space Coupling Framework: Deriving General Relativity as the IR Limit of Causal Substrate Dynamics* (MSCF v2.2.1). [DOI: 10.5281/zenodo.18668395](https://doi.org/10.5281/zenodo.18668395)
+> 2. **Search:** Roland, I. (2026). *Are Black Hole Horizons Classical? A Parameter-Free Echo Search in LIGO O1-O3*. [DOI: 10.5281/zenodo.18772362](https://doi.org/10.5281/zenodo.18772362)
 
 Every numerical result in the paper can be reproduced from the scripts in
 `code/` and `mscf_derived_echo/`. Each script is self-contained and
