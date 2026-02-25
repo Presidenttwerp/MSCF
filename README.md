@@ -9,7 +9,7 @@ This repository contains the computation scripts, precomputed results, and publi
 > 1. **Theory:** Roland, I. (2026). *Matter-Space Coupling Framework: Deriving General Relativity as the IR Limit of Causal Substrate Dynamics* (MSCF v2.2.1). [DOI: 10.5281/zenodo.18668395](https://doi.org/10.5281/zenodo.18668395)
 > 2. **Search:** Roland, I. (2026). *Are Black Hole Horizons Classical? A Parameter-Free Echo Search in LIGO O1-O3*. [DOI: 10.5281/zenodo.18772362](https://doi.org/10.5281/zenodo.18772362)
 
-Every numerical result in the paper can be reproduced from the scripts in
+Every numerical result in both papers can be reproduced from the scripts in
 `code/` and `mscf_derived_echo/`. Each script is self-contained and
 independently verifiable.
 
@@ -125,10 +125,15 @@ from `coupled_mode_evolution.py` and `phase_correlation_test.py`.
 
 ## Citation
 
-If you use this code, please cite the accompanying paper:
+If you use this code, please cite the accompanying papers:
 
-> Roland, I. (2026). Matter-Space Coupling Framework: Deriving General
-> Relativity as the IR Limit of Causal Substrate Dynamics. Preprint.
+> 1. Roland, I. (2026). Matter-Space Coupling Framework: Deriving General
+> Relativity as the IR Limit of Causal Substrate Dynamics.
+> [DOI: 10.5281/zenodo.18668395](https://doi.org/10.5281/zenodo.18668395)
+>
+> 2. Roland, I. (2026). Are Black Hole Horizons Classical? A Parameter-Free
+> Echo Search in LIGO O1-O3.
+> [DOI: 10.5281/zenodo.18772362](https://doi.org/10.5281/zenodo.18772362)
 
 See `CITATION.cff` for machine-readable citation metadata.
 

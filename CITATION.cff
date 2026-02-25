@@ -5,5 +5,21 @@ authors:
     given-names: "Ishay"
     orcid: "https://orcid.org/0009-0002-7687-7696"
 title: "Matter-Space Coupling Framework (MSCF) Numerical Suite"
-version: 2.0.0
-date-released: 2026-02-16
+version: 2.2.1
+doi: "10.5281/zenodo.18648268"
+date-released: 2026-02-17
+references:
+  - type: article
+    authors:
+      - family-names: "Roland"
+        given-names: "Ishay"
+    title: "Matter-Space Coupling Framework: Deriving General Relativity as the IR Limit of Causal Substrate Dynamics"
+    year: 2026
+    doi: "10.5281/zenodo.18668395"
+  - type: article
+    authors:
+      - family-names: "Roland"
+        given-names: "Ishay"
+    title: "Are Black Hole Horizons Classical? A Parameter-Free Echo Search in LIGO O1-O3"
+    year: 2026
+    doi: "10.5281/zenodo.18772362"
